@@ -1,0 +1,41 @@
+library(ggplot2)
+df <- read.csv("x", stringsAsFactors = FALSE)
+
+#Divide df into the 4 different routes (15, 15L, 16, 16L)
+df15 <- df[df$RouteName =="15", ]
+df15L <- df[df$RouteName =="15L",]
+df16 <- df[df$RouteName =="16",]
+df16L <- df[df$RouteName =="16L",]
+
+
+#Regression 1 (All Routes included)
+fit1 <- lm(df$TRIP_DIFF_MINUTES ~ df$LENGTH + df$YearsOld + df$LIFE_MILEAGE + 
+             df$MAX_LOAD + df$LOAD + df$SCHEDULED_SPEED + df$ACTUAL_SPEED + 
+             df$PASSENGERS_OFF + df$PASSENGERS_ON)
+summary(fit1) #(R^2 = 16.94%, Adj R^2 = 16.94%)
+
+#Regression Route 15 (only uses Length 40', so Length variable is removed)
+fit15 <- lm(df15$TRIP_DIFF_MINUTES ~ df15$YearsOld + df15$LIFE_MILEAGE + 
+             df15$MAX_LOAD + df15$LOAD + df15$SCHEDULED_SPEED + df15$ACTUAL_SPEED + 
+             df15$PASSENGERS_OFF + df15$PASSENGERS_ON)
+summary(fit15) #(R^2 = 18.44%, Adj R^2 = 18.43%)
+
+#Regression Route 15L (only uses Length 60', so Length variable is removed)
+fit15L <- lm(df15L$TRIP_DIFF_MINUTES ~ df15L$YearsOld + df15L$LIFE_MILEAGE + 
+              df15L$MAX_LOAD + df15L$LOAD + df15L$SCHEDULED_SPEED + df15L$ACTUAL_SPEED + 
+              df15L$PASSENGERS_OFF + df15L$PASSENGERS_ON)
+summary(fit15L) #(R^2 = 20.53%, Adj R^2 = 20.52%)
+
+
+#Regression Route 16 (uses both Length 40' and 60' (but mosty 60'), so keep Length variable)
+fit16 <- lm(df16$TRIP_DIFF_MINUTES ~ df16$LENGTH + 
+              df16$MAX_LOAD + df16$LOAD + df16$SCHEDULED_SPEED + df16$ACTUAL_SPEED + 
+              df16$PASSENGERS_OFF)
+summary(fit16) #(R^2 = 10.01%, Adj R^2 = 10%)
+
+
+#Regression Route 16L (uses only 40', so remove Length variable)
+fit16L <- lm(df16L$TRIP_DIFF_MINUTES ~ df16L$YearsOld + df16L$LIFE_MILEAGE + 
+               df16L$MAX_LOAD + df16L$LOAD + df16L$SCHEDULED_SPEED + df16L$ACTUAL_SPEED + 
+               df16L$PASSENGERS_OFF + df16L$PASSENGERS_ON)
+summary(fit16L) #(R^2 = 13.01%, Adj R^2 = 12.99%)
