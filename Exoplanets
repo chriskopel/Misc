@@ -1,0 +1,118 @@
+df <- read.csv("x.csv", stringsAsFactors = FALSE)
+library(ggplot2)
+library(gridExtra)
+library(pastecs)
+library(scales)
+
+#NASA Exoplanet Archive: http://exoplanetarchive.ipac.caltech.edu/cgi-bin/TblView/nph-tblView?app=ExoTbls&config=planets
+
+#deriving luminosity
+df$st_lum <- ((df$st_rad)^2 * (df$st_teff/5778)^4)
+options(scipen = 50)
+
+#pulling only UNIQUE STARS into separate df (=stars df) (STARS REGRESSION DF)
+sdf <- df[!duplicated(df$pl_hostname),c(1,2,19:25)]
+
+#table with frequencies of stars
+as.data.frame(table(df$pl_hostname))
+
+#number of stars greater than x
+length(sdf$st_teff[df$st_teff > 8000])
+
+#summary stats of stars
+options(scipen=100)
+options(digits=2)
+stat.desc(sdf$st_lum)
+
+#histogram of star temperatures
+stTemp <- qplot(sdf$st_teff, 
+                main = "Histogram of Star Temperatures",
+                xlab = "Star Temperature (Kelvin)",
+                ylab = "Count",
+                xlim = c(0,8000),
+                #ylim = c(0,10000),
+                #binwidth = 1,
+                fill = I("orange"))
+stTemp + geom_vline(linetype="dashed", xintercept=5778) + 
+  geom_text(aes(x=5200, label="Temp of the Sun", y=200), colour="black") + 
+  geom_text(aes(x=5200, label="(5778)", y=190), colour = "black")
+
+#histogram of star luminosities
+stLum <- qplot(sdf$st_lum, 
+                main = "Histogram of Star Luminosities",
+                xlab = "Star Luminosity (Solar Units)",
+                ylab = "Count",
+                xlim = c(0,200),
+                ylim = c(0,80),
+                #binwidth = 1,
+                fill = I("blue"))
+stLum + geom_vline(linetype="dashed", xintercept=5778) + 
+  geom_text(aes(x=5200, label="Temp of the Sun", y=200), colour="black") + 
+  geom_text(aes(x=5200, label="(5778)", y=190), colour = "black")
+
+
+#dividing stars by upper and lower luminosity
+summary(sdf$st_lum)
+qplot(sdf$st_lum, 
+                main = "Histogram for Stars' Opt. Mag",
+                xlab = "Luminosity",
+                ylab = "Count",
+                xlim = c(0,20),
+                binwidth = 0.5,
+                fill = I("blue"))
+#subset to two groups (upper and lower half based on median (1.228) and omit luminosity nulls)
+length(sdf$st_lum[sdf$st_lum > 1.228]) #2 gives 617 values which is closest to halfway point of 613
+#TWO SAMPLE TEST ON STAR LUMINOSITY
+sUpper <- sdf[(sdf$st_lum >= 11.89) & (!is.na(sdf$st_lum)),]
+sLower <- sdf[(sdf$st_lum < 11.89) & (!is.na(sdf$st_lum)),]
+
+
+
+
+#Scatterplot between Temp and Lum (basic) (w/ outliers)
+plot(sdf$st_teff, sdf$st_lum, main = "Scatterplot of Temperature vs. Luminosity", 
+     xlab = "Temperature", ylab = "Luminosity")
+#ggplot
+starScat <- ggplot(data = sdf, aes(x = st_teff, y = st_lum) )
+stScat <- starScat + geom_point(aes(colour = st_teff)) + 
+  labs(title = "Recreated HR Diagram", x = "Temperature (Kelvin)", 
+       y = "Luminosity (solar units)") + 
+       scale_colour_gradient(limits = c(0,8000), low = "red", high = "yellow")
+stScat + scale_x_reverse(limits = c(8000, 2000)) + scale_y_log10() + 
+  geom_hline(yintercept=1, linetype = 2) + 
+  geom_text(aes(x=3700, label="Luminosity of the Sun (1 SU)", y=2), colour="black") +
+  geom_vline(xintercept = 5778, linetype = 2) +
+  geom_text(aes(x=6000, label = "Temperature of the Sun (5778K)", y=0.001, angle=90))
+
+
+
+
+#simple regression on all stars (w/ outliers)
+fit <- lm(sdf$st_lum ~ sdf$st_teff)
+summary(fit)
+#regression on stars w/ derived variables
+fitD <- lm(sdf$st_lum ~ sdf$st_teff + sdf$st_rad)
+summary(fitD)
+#multiple regression for lum
+fit1 <- lm(sdf$st_lum ~ sdf$st_teff + sdf$st_dist + sdf$st_mass + sdf$st_rad)
+summary(fit1)
+#multiple regression for temp
+fitT <- lm(sdf$st_teff ~ sdf$st_rad + sdf$st_mass + sdf$st_dist)
+summary(fitT)
+
+#PLANET ANALYSIS
+options(scipen=100)
+options(digits=2)
+stat.desc(df$pl_bmassj)
+qplot(df$pl_bmassj, 
+      main = "Histogram of Planet Masses",
+      xlab = "Mass (units of masses of Jupiter)",
+      ylab = "Count",
+      #xlim = c(0,200),
+      #ylim = c(0,80),
+      binwidth = 1,
+      fill = I("purple"))
+
+#regression for mass
+fit3 <- lm(df$pl_bmassj ~ df$pl_orbsmax + df$pl_orbper + df$pl_radj + df$pl_dens)
+summary(fit3)
