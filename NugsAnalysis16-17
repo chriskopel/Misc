@@ -1,0 +1,125 @@
+library(ggplot2)
+library(sqldf)
+library(scales)
+library(corrgram)
+library(maps)
+library(ggmap) #https://journal.r-project.org/archive/2013-1/kahle-wickham.pdf
+library(geosphere) #http://stackoverflow.com/questions/32363998/function-to-calculate-geospatial-distance-between-two-points-lat-long-using-r
+                    #ftp://cran.r-project.org/pub/R/web/packages/geosphere/geosphere.pdf
+df <- read.csv("x.csv", stringsAsFactors = FALSE)
+dfw <- subset(df,df$PointDiffNeg > 0)
+dfl <- subset(df,df$PointDiffNeg < 0)
+dfcloseg <- subset(df,df$PointDiffAbs <= 5)
+dfvars <- df[,c("DoW", "Time", "Home", "ResultWL")]
+dfFri <- dfvars[df$DoW == "Fri",]
+df$Date <- as.Date(df$Date, "%Y/%m/%d")
+
+#split the date column up
+
+strsplit(df$Date, ",")
+
+#compare average point differential b/w wins and losses
+mean(dfw$PointDiff)
+mean(dfl$PointDiff)
+median(dfw$PointDiff)
+median(dfl$PointDiff)
+
+#graph analyzing close games (within 5 points)
+ggplot() + 
+  geom_bar(data = dfcloseg, aes(x=Date, y=PointDiffNeg),stat = "identity") +
+  geom_bar(data = dfcloseg, aes(x=Date, y=PointDiffNeg),stat = "identity") +
+  scale_fill_brewer(type = "seq", palette = 1)
+
+#counting close game w/l (5-8)
+sum(dfcloseg$Result == '1')
+sum(dfcloseg$Result == '0')
+
+#correlation vis: http://www.statmethods.net/advgraphs/correlograms.html
+corrgram(dfvars, order=TRUE, lower.panel=panel.shade,
+         upper.panel=panel.pie, text.panel=panel.txt,
+         main="Nugs Variables Corr Analysis")
+mylogit <- glm(dfvars$Result ~ dfvars$DoW + dfvars$Time + dfvars$Home)
+summary(mylogit)
+confint(mylogit)
+exp(coef(mylogit))
+
+#look at win/loss by day (lost all on Fri (0-5))
+ggplot(dfvars, aes(DoW, fill=ResultWL ) ) +
+  geom_bar(position="dodge")
+dfFri <- sqldf("
+          SELECT ResultWL, Date, Opponent, Home 
+          FROM df
+          WHERE 1=1 
+          AND DoW = 'Fri'
+          AND Date <= '2/24/2017'  
+               ")
+#counting W or L from 
+sqldf("
+      SELECT ResultWL AS Result, COUNT(*) AS Total
+      FROM dfFri
+      GROUP BY ResultWL
+      ORDER BY ResultWL DESC
+      ")
+
+
+#grouping total points (+-) per state (and WL by state)
+#AggPoints...Create df:
+dfPtsState <- sqldf("
+                    SELECT SUM(Tm) AS TotalTeam,
+                           SUM(Opp) AS TotalOpp,
+                           SUM(Tm) - SUM(Opp) AS Agg,
+                           COUNT(State) AS GamesPlayed,
+                           State
+                    FROM df
+                    WHERE 1=1
+                    AND Date < '2/28/2017'
+                    GROUP BY State
+                    ")
+
+
+#AggW/L:
+dfWLState <- sqldf("
+                   SELECT 
+                      SUM(CASE WHEN ResultWL = 'W' THEN 1 ELSE 0 END) AS Wins,
+                      SUM(CASE WHEN ResultWL = 'L' THEN 1 ELSE 0 END) AS Losses,
+                      COUNT(State) AS GamesPlayed,
+                      State
+                   FROM df
+                   WHERE 1=1
+                   AND Date < '2/28/2017'
+                   GROUP BY State
+                   ")
+
+
+#(win/loss) by month
+boxplot(Opp~Month, data = df, main="Point Distr by Month",
+        xlab="Month", ylab="Points")
+
+ggplot() + geom_bar(aes(y = , x = df$Month, fill = df$ResultWL), stat = "identity")
+
+#exploring relationship b/w w/l vs miles travelled
+fit <- glm(df$Result ~ df$DistTravmi)
+fit1 <- lm(df$Tm ~ df$DistTravmi)
+plot(df$Tm ~ df$DistTravmi)
+plot(df$Opp ~ df$DistTravmi)
+abline(lm(df$Opp ~ df$DistTravmi))
+summary(fit1)$r.squared
+
+
+#historgram of games played by DoW
+dfDoW <- sqldf("
+                   SELECT ResultWL, Date, DoW
+                   FROM df
+                   WHERE TM NOT NULL
+               ")
+ggplot(data = dfDoW, aes(x = DoW, fill=ResultWL)) + geom_bar(stat="count")
+sqldf(" SELECT 
+          SUM(CASE WHEN ResultWL = 'W' THEN 1 ELSE 0 END) AS Wins,
+          SUM(CASE WHEN ResultWL = 'L' THEN 1 ELSE 0 END) AS Losses,
+          COUNT(State) AS GamesPlayed,
+          DoW
+        FROM df
+        WHERE 1=1
+        AND TM NOT NULL
+        AND DoW = 'Mon'
+        GROUP BY DoW")
